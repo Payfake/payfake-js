@@ -49,7 +49,7 @@ export class TransactionNamespace {
     );
     // snake_case → camelCase on the way back
     return {
-      authorizationUrl: data.authorizationUrl,
+      authorizationUrl: data.authorization_url,
       accessCode: data.access_code,
       reference: data.reference,
     };

@@ -24,7 +24,7 @@
  * console.log(charge.transaction.status) // "success" or "failed"
  */
 
-export { Client } from "./client.js";
+import { Client } from "./client.js";
 export { PayfakeError } from "./errors.js";
 
 /**
@@ -39,6 +39,5 @@ export { PayfakeError } from "./errors.js";
  * @returns {Client}
  */
 export function createClient(config) {
-  const { Client } = import("./client.js");
   return new Client(config);
 }
