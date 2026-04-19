@@ -75,4 +75,72 @@ export class AuthNamespace {
     );
     return { publicKey: data.public_key, secretKey: data.secret_key };
   }
+
+  /**
+   * Get full merchant profile.
+   * @param {string} token
+   */
+  async getProfile(token) {
+    return this._client._request("GET", "/api/v1/merchant", null, token);
+  }
+
+  /**
+   * Update merchant business name and/or webhook URL.
+   * @param {string} token
+   * @param {{ businessName?: string, webhookUrl?: string }} input
+   */
+  async updateProfile(token, { businessName, webhookUrl } = {}) {
+    return this._client._request(
+      "PUT",
+      "/api/v1/merchant",
+      {
+        business_name: businessName,
+        webhook_url: webhookUrl,
+      },
+      token,
+    );
+  }
+
+  /**
+   * Get current webhook URL and status.
+   * @param {string} token
+   */
+  async getWebhookURL(token) {
+    return this._client._request(
+      "GET",
+      "/api/v1/merchant/webhook",
+      null,
+      token,
+    );
+  }
+
+  /**
+   * Set webhook URL.
+   * @param {string} token
+   * @param {string} webhookUrl
+   */
+  async updateWebhookURL(token, webhookUrl) {
+    return this._client._request(
+      "POST",
+      "/api/v1/merchant/webhook",
+      {
+        webhook_url: webhookUrl,
+      },
+      token,
+    );
+  }
+
+  /**
+   * Fire a test webhook to verify the endpoint is reachable.
+   * Rate limited to 5 per minute per merchant.
+   * @param {string} token
+   */
+  async testWebhook(token) {
+    return this._client._request(
+      "POST",
+      "/api/v1/merchant/webhook/test",
+      null,
+      token,
+    );
+  }
 }

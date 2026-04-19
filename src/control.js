@@ -197,4 +197,36 @@ export class ControlNamespace {
     const data = await this._client._request("GET", path, null, token);
     return data.otp_logs ?? [];
   }
+
+  /**
+   * List transactions — JWT authenticated, for the dashboard.
+   * Supports status filter and search by reference or customer email.
+   *
+   * @param {string} token
+   * @param {{ page?: number, perPage?: number, status?: string, search?: string }} opts
+   */
+  async listTransactions(
+    token,
+    { page = 1, perPage = 50, status = "", search = "" } = {},
+  ) {
+    let path = `/api/v1/control/transactions?page=${page}&per_page=${perPage}`;
+    if (status) path += `&status=${status}`;
+    if (search) path += `&search=${encodeURIComponent(search)}`;
+    return this._client._request("GET", path, null, token);
+  }
+
+  /**
+   * List customers — JWT authenticated, for the dashboard.
+   *
+   * @param {string} token
+   * @param {{ page?: number, perPage?: number }} opts
+   */
+  async listCustomers(token, { page = 1, perPage = 50 } = {}) {
+    return this._client._request(
+      "GET",
+      `/api/v1/control/customers?page=${page}&per_page=${perPage}`,
+      null,
+      token,
+    );
+  }
 }
