@@ -173,4 +173,28 @@ export class ControlNamespace {
   async clearLogs(token) {
     await this._client._request("DELETE", "/api/v1/control/logs", null, token);
   }
+
+  /**
+   * Fetch OTP codes generated during charge flows.
+   * Pass reference to filter for a specific transaction.
+   * This is the primary way to read OTPs during testing without a real phone.
+   *
+   * @param {string} token
+   * @param {{ reference?: string, page?: number, perPage?: number }} opts
+   * @returns {Promise<OTPLog[]>}
+   *
+   * @example
+   * const logs = await client.control.getOTPLogs(token, { reference: tx.reference })
+   * console.log("OTP:", logs[0].otp_code)
+   */
+  async getOTPLogs(token, { reference = "", page = 1, perPage = 50 } = {}) {
+    let path = `/api/v1/control/otp-logs`;
+    if (reference) {
+      path += `?reference=${reference}`;
+    } else {
+      path += `?page=${page}&per_page=${perPage}`;
+    }
+    const data = await this._client._request("GET", path, null, token);
+    return data.otp_logs ?? [];
+  }
 }

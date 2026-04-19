@@ -68,43 +68,47 @@ async function main() {
 
   // STEP 4: Initialize a Transaction
 
+  // ── Full local card flow ──────────────────────────────────────
   const tx = await client.transaction.initialize({
     email: "customer@example.com",
-    amount: 10000, // Amount in smallest currency unit (e.g., 10000 = 100.00 GHS)
+    amount: 10000,
     currency: "GHS",
   });
+  console.log("Reference:", tx.reference);
 
-  console.log("\nTransaction initialized");
-  console.log("Reference:         ", tx.reference);
-  console.log("Access code:       ", tx.accessCode);
-  console.log("Authorization URL: ", tx.authorizationUrl);
+  // Step 1 — local Verve card → send_pin
+  const step1 = await client.charge.card({
+    accessCode: tx.accessCode,
+    cardNumber: "5061000000000000",
+    cardExpiry: "12/26",
+    cvv: "123",
+    email: "customer@example.com",
+  });
+  console.log("Step 1:", step1.status); // send_pin
 
-  // STEP 5: Charge a Card
+  // Step 2 — submit PIN → send_otp
+  const step2 = await client.charge.submitPIN({
+    reference: tx.reference,
+    pin: "1234",
+  });
+  console.log("Step 2:", step2.status); // send_otp
 
-  try {
-    const charge = await client.charge.card({
-      accessCode: tx.accessCode,
-      cardNumber: "4111111111111111",
-      cardExpiry: "12/26",
-      cvv: "123",
-      email: "customer@example.com",
-    });
-    console.log("\nCharge status:", charge.transaction.status);
-  } catch (err) {
-    if (
-      err instanceof PayfakeError &&
-      err.isCode(PayfakeError.CODE_CHARGE_FAILED)
-    ) {
-      console.log("\nCharge failed:", err.fields[0]?.message ?? err.code);
-    } else {
-      throw err;
-    }
-  }
+  // Step 3 — read OTP from logs
+  const otpLogs = await client.control.getOTPLogs(token, {
+    reference: tx.reference,
+  });
+  const otpCode = otpLogs[0]?.otp_code;
+  console.log("OTP:", otpCode);
 
-  // STEP 6: Verify Transaction
+  // Step 4 — submit OTP → success
+  const step3 = await client.charge.submitOTP({
+    reference: tx.reference,
+    otp: otpCode,
+  });
+  console.log("Step 3:", step3.status); // success
 
   const verified = await client.transaction.verify(tx.reference);
-  console.log("Verified status:", verified.status);
+  console.log("Verified:", verified.status);
 
   // STEP 7: Mobile Money Payment Flow
 
