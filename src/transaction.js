@@ -101,4 +101,48 @@ export class TransactionNamespace {
   async refund(id) {
     return this._client._request("POST", `/api/v1/transaction/${id}/refund`);
   }
+
+  /**
+   * Load transaction details for the checkout page.
+   * No secret key required — authenticated via access code in the URL.
+   * Returns amount, merchant branding, customer email and charge flow status.
+   * Call this on checkout page mount to hydrate the payment form.
+   *
+   * @param {string} accessCode
+   * @returns {Promise<object>} PublicTransactionResponse
+   *
+   * @example
+   * const tx = await client.transaction.publicFetch(accessCode)
+   * console.log(`Pay ${tx.merchant.business_name} ${tx.currency} ${tx.amount / 100}`)
+   */
+  async publicFetch(accessCode) {
+    return this._client._request(
+      "GET",
+      `/api/v1/public/transaction/${accessCode}`,
+    );
+  }
+
+  /**
+   * Poll transaction status for MoMo pay_offline state.
+   * No secret key required. Check status and charge.flow_status each tick.
+   * Stop polling when status is "success" or "failed".
+   *
+   * @param {string} reference
+   * @returns {Promise<object>} PublicVerifyResponse
+   *
+   * @example
+   * const poll = setInterval(async () => {
+   *   const result = await client.transaction.publicVerify(reference)
+   *   if (result.status === "success" || result.status === "failed") {
+   *     clearInterval(poll)
+   *     handleResult(result)
+   *   }
+   * }, 3000)
+   */
+  async publicVerify(reference) {
+    return this._client._request(
+      "GET",
+      `/api/v1/public/transaction/verify/${reference}`,
+    );
+  }
 }
