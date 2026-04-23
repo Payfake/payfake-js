@@ -1,147 +1,149 @@
 /**
- * ChargeNamespace wraps all charge flow endpoints.
- * Every method returns a ChargeFlowResponse — read the status field
- * to determine what step comes next in the checkout flow.
+ * ChargeNamespace wraps /charge endpoints.
+ * These match https://api.paystack.co/charge exactly.
+ * All methods call POST /charge, channel detected from body object.
+ * Auth: Bearer sk_test_xxx
  */
 export class ChargeNamespace {
-  /** @param {import("./client.js").Client} client */
+  /** @param {import('./client.js').Client} client */
   constructor(client) {
     this._client = client;
   }
 
   /**
-   * Initiate a card charge.
-   * Local Verve cards (5061, 5062, 5063, 6500, 6501) → status: "send_pin"
-   * International Visa/Mastercard → status: "open_url" + three_ds_url
+   * Initiate a card charge via POST /charge.
+   *
+   * Local Ghana cards (Verve: 5061, 5062, 5063, 6500, 6501):
+   *   returns status "send_pin" → call submitPIN
+   *
+   * International cards (Visa 4xxx, Mastercard 5xxx):
+   *   returns status "open_url" + url → checkout navigates to url
    *
    * @param {{
+   *   email: string,
+   *   amount?: number,
    *   accessCode?: string,
    *   reference?: string,
-   *   cardNumber: string,
-   *   cardExpiry: string,
-   *   cvv: string,
-   *   email: string
+   *   card: { number: string, cvv: string, expiryMonth: string, expiryYear: string }
    * }} input
-   * @returns {Promise<ChargeFlowResponse>}
    */
-  async card({ accessCode, reference, cardNumber, cardExpiry, cvv, email }) {
-    return this._client._request("POST", "/api/v1/charge/card", {
+  async card({ email, amount, accessCode, reference, card }) {
+    return this._client._do("POST", "/charge", {
+      email,
+      amount,
       access_code: accessCode,
       reference,
-      card_number: cardNumber,
-      card_expiry: cardExpiry,
-      cvv,
-      email,
+      card: card
+        ? {
+            number: card.number,
+            cvv: card.cvv,
+            expiry_month: card.expiryMonth,
+            expiry_year: card.expiryYear,
+          }
+        : undefined,
     });
   }
 
   /**
-   * Initiate a mobile money charge.
-   * Always returns status: "send_otp" — customer verifies phone first.
-   * After OTP returns "pay_offline" — poll transaction for webhook outcome.
+   * Initiate a MoMo charge via POST /charge.
+   * Returns status "send_otp" → call submitOTP.
+   * After OTP returns "pay_offline" → poll transaction.publicVerify.
    *
    * @param {{
+   *   email: string,
+   *   amount?: number,
    *   accessCode?: string,
    *   reference?: string,
-   *   phone: string,
-   *   provider: "mtn"|"vodafone"|"airteltigo",
-   *   email: string
+   *   mobileMoney: { phone: string, provider: "mtn" | "vodafone" | "airteltigo" }
    * }} input
-   * @returns {Promise<ChargeFlowResponse>}
    */
-  async mobileMoney({ accessCode, reference, phone, provider, email }) {
-    return this._client._request("POST", "/api/v1/charge/mobile_money", {
+  async mobileMoney({ email, amount, accessCode, reference, mobileMoney }) {
+    return this._client._do("POST", "/charge", {
+      email,
+      amount,
       access_code: accessCode,
       reference,
-      phone,
-      provider,
-      email,
+      mobile_money: mobileMoney
+        ? {
+            phone: mobileMoney.phone,
+            provider: mobileMoney.provider,
+          }
+        : undefined,
     });
   }
 
   /**
-   * Initiate a bank transfer charge.
-   * Returns status: "send_birthday" — customer enters date of birth first.
+   * Initiate a bank transfer charge via POST /charge.
+   * Returns status "send_birthday" → call submitBirthday.
    *
    * @param {{
+   *   email: string,
+   *   amount?: number,
    *   accessCode?: string,
    *   reference?: string,
-   *   bankCode: string,
-   *   accountNumber: string,
-   *   email: string
+   *   bank: { code: string, accountNumber: string },
+   *   birthday?: string
    * }} input
-   * @returns {Promise<ChargeFlowResponse>}
    */
-  async bank({ accessCode, reference, bankCode, accountNumber, email }) {
-    return this._client._request("POST", "/api/v1/charge/bank", {
+  async bank({ email, amount, accessCode, reference, bank, birthday }) {
+    return this._client._do("POST", "/charge", {
+      email,
+      amount,
       access_code: accessCode,
       reference,
-      bank_code: bankCode,
-      account_number: accountNumber,
-      email,
+      birthday,
+      bank: bank
+        ? {
+            code: bank.code,
+            account_number: bank.accountNumber,
+          }
+        : undefined,
     });
   }
 
   /**
-   * Submit card PIN after status: "send_pin".
-   * Returns status: "send_otp" — OTP sent to registered phone.
-   * Read OTP from client.control.getOTPLogs(token, { reference }).
+   * Submit card PIN after status "send_pin".
+   * Returns status "send_otp", OTP sent to registered phone.
+   * Read OTP from control.getOTPLogs during testing (no real phone needed).
    *
    * @param {{ reference: string, pin: string }} input
-   * @returns {Promise<ChargeFlowResponse>}
    */
   async submitPIN({ reference, pin }) {
-    return this._client._request("POST", "/api/v1/charge/submit_pin", {
-      reference,
-      pin,
-    });
+    return this._client._do("POST", "/charge/submit_pin", { reference, pin });
   }
 
   /**
-   * Submit OTP after status: "send_otp".
+   * Submit OTP after status "send_otp".
    * Card/bank: returns "success" or "failed".
-   * MoMo: returns "pay_offline" — poll transaction for final outcome.
+   * MoMo: returns "pay_offline", poll transaction.publicVerify for final outcome.
    *
    * @param {{ reference: string, otp: string }} input
-   * @returns {Promise<ChargeFlowResponse>}
    */
   async submitOTP({ reference, otp }) {
-    return this._client._request("POST", "/api/v1/charge/submit_otp", {
-      reference,
-      otp,
-    });
+    return this._client._do("POST", "/charge/submit_otp", { reference, otp });
   }
 
   /**
-   * Submit date of birth after status: "send_birthday".
-   * Returns status: "send_otp" on success.
+   * Submit date of birth after status "send_birthday".
+   * Returns status "send_otp" on success.
    *
    * @param {{ reference: string, birthday: string }} input - birthday: YYYY-MM-DD
-   * @returns {Promise<ChargeFlowResponse>}
    */
   async submitBirthday({ reference, birthday }) {
-    return this._client._request("POST", "/api/v1/charge/submit_birthday", {
+    return this._client._do("POST", "/charge/submit_birthday", {
       reference,
       birthday,
     });
   }
 
   /**
-   * Submit billing address after status: "send_address".
+   * Submit billing address after status "send_address".
    * Returns "success" or "failed".
    *
-   * @param {{
-   *   reference: string,
-   *   address: string,
-   *   city: string,
-   *   state: string,
-   *   zipCode: string,
-   *   country: string
-   * }} input
-   * @returns {Promise<ChargeFlowResponse>}
+   * @param {{ reference: string, address: string, city: string, state: string, zipCode: string, country: string }} input
    */
   async submitAddress({ reference, address, city, state, zipCode, country }) {
-    return this._client._request("POST", "/api/v1/charge/submit_address", {
+    return this._client._do("POST", "/charge/submit_address", {
       reference,
       address,
       city,
@@ -152,41 +154,36 @@ export class ChargeNamespace {
   }
 
   /**
-   * Request a new OTP after status: "send_otp".
-   * Invalidates the previous OTP. Returns "send_otp" with fresh OTP.
-   * Read new OTP from client.control.getOTPLogs(token, { reference }).
+   * Request a fresh OTP when the customer hasn't received one.
+   * Invalidates the previous OTP. Returns status "send_otp".
+   * Read the new OTP from control.getOTPLogs.
    *
    * @param {{ reference: string }} input
-   * @returns {Promise<ChargeFlowResponse>}
    */
   async resendOTP({ reference }) {
-    return this._client._request("POST", "/api/v1/charge/resend_otp", {
-      reference,
-    });
-  }
-
-  /**
-   * Complete the simulated 3DS verification.
-   * Call this after the customer confirms on the checkout app's 3DS page.
-   * Returns "success" or "failed" based on the scenario config.
-   *
-   * @param {string} reference - Transaction reference
-   * @returns {Promise<ChargeFlowResponse>}
-   */
-  async simulate3DS(reference) {
-    return this._client._request(
-      "POST",
-      `/api/v1/public/simulate/3ds/${reference}`,
-    );
+    return this._client._do("POST", "/charge/resend_otp", { reference });
   }
 
   /**
    * Fetch the current state of a charge by transaction reference.
-   *
    * @param {string} reference
-   * @returns {Promise<object>}
    */
   async fetch(reference) {
-    return this._client._request("GET", `/api/v1/charge/${reference}`);
+    return this._client._do("GET", `/charge/${reference}`, null);
+  }
+
+  /**
+   * Complete the simulated 3DS verification.
+   * Called by the checkout app after the customer confirms on the 3DS page.
+   * Returns "success" or "failed" based on the scenario config.
+   *
+   * @param {string} reference
+   */
+  async simulate3DS(reference) {
+    return this._client._doPublic(
+      "POST",
+      `/api/v1/public/simulate/3ds/${reference}`,
+      null,
+    );
   }
 }

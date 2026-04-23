@@ -1,183 +1,172 @@
-// example/index.js
 import { createClient, PayfakeError } from "../src/index.js";
 
-/**
- * Example usage of the Payfake JS SDK
- *
- * This demonstrates the complete flow:
- * 1. Authentication (register/login)
- * 2. Retrieving API keys
- * 3. Initializing transactions
- * 4. Processing card payments
- * 5. Verifying transactions
- * 6. Mobile money payments
- * 7. Control panel operations (testing scenarios)
- */
-
-// Create a client for authentication endpoints
-// No secret key is required for auth operations
-const authClient = createClient({
-  secretKey: "",
-  baseURL: "http://localhost:8080",
+const client = createClient({
+  secretKey: "sk_test_your_key_here",
+  baseURL: "https://api.payfake.co",
 });
 
-async function main() {
-  // STEP 1: Authentication, Register or Login
-
-  let authToken;
-
-  try {
-    const reg = await authClient.auth.register({
-      businessName: "Acme Store",
+//  Register
+let token;
+try {
+  const resp = await client.auth.register({
+    business_name: "Acme Store",
+    email: "dev@acme.com",
+    password: "secret123",
+  });
+  token = resp.access_token;
+  console.log("Registered:", resp.merchant.id);
+} catch (err) {
+  if (
+    err instanceof PayfakeError &&
+    err.isCode(PayfakeError.CODE_EMAIL_TAKEN)
+  ) {
+    console.log("Email taken — logging in");
+    const resp = await client.auth.login({
       email: "dev@acme.com",
       password: "secret123",
     });
-    console.log("Registered:", reg.merchant.id);
-    authToken = reg.token;
-  } catch (err) {
-    // If the email is already registered, log in instead
-    if (
-      err instanceof PayfakeError &&
-      err.isCode(PayfakeError.CODE_EMAIL_TAKEN)
-    ) {
-      const login = await authClient.auth.login({
-        email: "dev@acme.com",
-        password: "secret123",
-      });
-      authToken = login.token;
-      console.log("Logged in as:", login.merchant.email);
-    } else {
-      throw err;
-    }
-  }
-
-  // STEP 2: Retrieve API Keys
-
-  const keys = await authClient.auth.getKeys(authToken);
-  console.log("\nAPI Keys retrieved:");
-  console.log("Public Key:", keys.publicKey);
-  console.log("Secret Key:", keys.secretKey.substring(0, 10) + "...");
-
-  // STEP 3: Create Authenticated Client
-
-  // This client uses the secret key for payment operations
-  const client = createClient({
-    secretKey: keys.secretKey,
-    baseURL: "http://localhost:8080",
-  });
-
-  // STEP 4: Initialize a Transaction
-
-  // ── Full local card flow ──────────────────────────────────────
-  const tx = await client.transaction.initialize({
-    email: "customer@example.com",
-    amount: 10000,
-    currency: "GHS",
-  });
-  console.log("Reference:", tx.reference);
-
-  // Step 1 — local Verve card → send_pin
-  const step1 = await client.charge.card({
-    accessCode: tx.accessCode,
-    cardNumber: "5061000000000000",
-    cardExpiry: "12/26",
-    cvv: "123",
-    email: "customer@example.com",
-  });
-  console.log("Step 1:", step1.status); // send_pin
-
-  // Step 2 — submit PIN → send_otp
-  const step2 = await client.charge.submitPIN({
-    reference: tx.reference,
-    pin: "1234",
-  });
-  console.log("Step 2:", step2.status); // send_otp
-
-  // Step 3 — read OTP from logs
-  const otpLogs = await client.control.getOTPLogs(token, {
-    reference: tx.reference,
-  });
-  const otpCode = otpLogs[0]?.otp_code;
-  console.log("OTP:", otpCode);
-
-  // Step 4 — submit OTP → success
-  const step3 = await client.charge.submitOTP({
-    reference: tx.reference,
-    otp: otpCode,
-  });
-  console.log("Step 3:", step3.status); // success
-
-  const verified = await client.transaction.verify(tx.reference);
-  console.log("Verified:", verified.status);
-
-  // STEP 7: Mobile Money Payment Flow
-
-  // Initialize a separate transaction for mobile money
-  const tx2 = await client.transaction.initialize({
-    email: "momo@example.com",
-    amount: 5000,
-  });
-
-  const momo = await client.charge.mobileMoney({
-    accessCode: tx2.accessCode,
-    phone: "+233241234567",
-    provider: "mtn",
-    email: "momo@example.com",
-  });
-
-  // Mobile money transactions always return "pending" immediately
-  // The final outcome should be handled via webhook
-  console.log("\nMoMo status:", momo.transaction.status);
-
-  // STEP 8: Control Panel Operations (Testing/Debugging)
-
-  // Note: Control panel operations use the auth token, not the secret key
-
-  // Update the global scenario, 50% failure rate with 2 second delay
-  const scenario = await authClient.control.updateScenario(authToken, {
-    failureRate: 0.5,
-    delayMs: 2000,
-  });
-  console.log("\nScenario updated, failure rate:", scenario.failure_rate);
-
-  // Force a specific transaction to fail
-  const tx3 = await client.transaction.initialize({
-    email: "force@example.com",
-    amount: 2000,
-  });
-
-  const forced = await authClient.control.forceTransaction(
-    authToken,
-    tx3.reference,
-    {
-      status: "failed",
-      errorCode: "CHARGE_INSUFFICIENT_FUNDS",
-    },
-  );
-  console.log("Forced status:", forced.status);
-
-  // Reset the scenario back to default
-  await authClient.control.resetScenario(authToken);
-  console.log("Scenario reset");
-
-  // STEP 9: Retrieve Recent Logs
-
-  try {
-    const { logs } = await authClient.control.getLogs(authToken, {
-      perPage: 5,
-    });
-    console.log(`\nRecent requests: ${logs.length}`);
-    for (const log of logs) {
-      console.log(`  ${log.method} ${log.path} -> ${log.status_code}`);
-    }
-  } catch (err) {
-    if (err instanceof PayfakeError && err.isCode("LOGS_EMPTY")) {
-      console.log("\nNo logs found yet (expected for new merchant)");
-    } else {
-      throw err;
-    }
+    token = resp.access_token;
+  } else {
+    throw err;
   }
 }
 
-// Run the example
-main().catch(console.error);
+//  Get keys and reconfigure client
+const keys = await client.auth.getKeys(token);
+console.log("Secret key:", keys.secret_key.slice(0, 20) + "...");
+
+const authedClient = createClient({
+  secretKey: keys.secret_key,
+  baseURL: "https://api.payfake.co",
+});
+
+//  Initialize a transaction
+const tx = await authedClient.transaction.initialize({
+  email: "customer@example.com",
+  amount: 10000,
+  currency: "GHS",
+});
+console.log("\nReference:        ", tx.reference);
+console.log("Authorization URL:", tx.authorization_url);
+
+//  Full local Verve card flow
+console.log("\n Card flow (local Verve) ");
+
+// Step 1: Initiate
+// 5061xxxxxxxxxxxxxxxx = local Ghana Verve card → send_pin
+// 4111xxxxxxxxxxxx     = international Visa       → open_url (3DS)
+const step1 = await authedClient.charge.card({
+  email: "customer@example.com",
+  accessCode: tx.access_code,
+  card: {
+    number: "5061000000000000",
+    cvv: "123",
+    expiryMonth: "12",
+    expiryYear: "2026",
+  },
+});
+console.log("Step 1:", step1.status); // send_pin
+
+// Step 2: Submit PIN
+const step2 = await authedClient.charge.submitPIN({
+  reference: tx.reference,
+  pin: "1234",
+});
+console.log("Step 2:", step2.status); // send_otp
+
+// Step 3: Get OTP from logs, no real phone needed
+const otpLogs = await authedClient.control.getOTPLogs(token, tx.reference);
+const otp = otpLogs[0]?.otp_code;
+console.log("OTP:   ", otp);
+
+// Step 4: Submit OTP
+const step3 = await authedClient.charge.submitOTP({
+  reference: tx.reference,
+  otp,
+});
+console.log("Step 3:", step3.status); // success
+
+//  Verify
+const verified = await authedClient.transaction.verify(tx.reference);
+console.log("\nVerified:         ", verified.status);
+console.log("Gateway response: ", verified.gateway_response);
+console.log("Auth code:        ", verified.authorization?.authorization_code);
+
+//  MoMo flow
+console.log("\n MoMo flow ");
+
+const tx2 = await authedClient.transaction.initialize({
+  email: "momo@example.com",
+  amount: 5000,
+});
+
+const momo1 = await authedClient.charge.mobileMoney({
+  email: "momo@example.com",
+  accessCode: tx2.access_code,
+  mobileMoney: { phone: "+233241234567", provider: "mtn" },
+});
+console.log("MoMo step 1:", momo1.status); // send_otp
+
+const momoOTPs = await authedClient.control.getOTPLogs(token, tx2.reference);
+const momo2 = await authedClient.charge.submitOTP({
+  reference: tx2.reference,
+  otp: momoOTPs[0]?.otp_code,
+});
+console.log("MoMo step 2:", momo2.status); // pay_offline
+
+// Poll until resolved
+console.log("Polling for resolution...");
+for (let i = 0; i < 10; i++) {
+  const result = await authedClient.transaction.publicVerify(tx2.reference);
+  console.log(
+    `  poll ${i + 1}: status=${result.status} flow=${result.charge?.flow_status ?? "–"}`,
+  );
+  if (result.status === "success" || result.status === "failed") {
+    console.log("Resolved:", result.status);
+    break;
+  }
+  await new Promise((r) => setTimeout(r, 1000));
+}
+
+//  Scenario testing
+console.log("\n Scenario testing ");
+
+await authedClient.control.updateScenario(token, {
+  forceStatus: "failed",
+  errorCode: "CHARGE_INSUFFICIENT_FUNDS",
+});
+console.log("Scenario: force insufficient funds");
+
+const tx3 = await authedClient.transaction.initialize({
+  email: "fail@example.com",
+  amount: 10000,
+});
+try {
+  await authedClient.charge.card({
+    email: "fail@example.com",
+    accessCode: tx3.access_code,
+    card: {
+      number: "5061000000000000",
+      cvv: "123",
+      expiryMonth: "12",
+      expiryYear: "2026",
+    },
+  });
+} catch (err) {
+  console.log("Charge failed as expected:", err.code);
+  if (
+    err instanceof PayfakeError &&
+    err.isCode(PayfakeError.CODE_INSUFFICIENT_FUNDS)
+  ) {
+    console.log("Correctly identified as insufficient funds");
+  }
+}
+
+await authedClient.control.resetScenario(token);
+console.log("Scenario reset");
+
+//  Stats
+const stats = await authedClient.control.getStats(token);
+console.log(
+  `\nStats: total=${stats.transactions.total} success_rate=${stats.transactions.success_rate.toFixed(1)}%`,
+);

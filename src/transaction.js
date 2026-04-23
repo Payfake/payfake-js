@@ -1,148 +1,98 @@
 /**
- * TransactionNamespace wraps the /transaction endpoints.
- * All methods require the secret key set on the client.
+ * TransactionNamespace wraps /transaction endpoints.
+ * These match https://api.paystack.co/transaction exactly.
+ * Auth: Bearer sk_test_xxx
  */
 export class TransactionNamespace {
-  /** @param {import("./client.js").Client} client */
+  /** @param {import('./client.js').Client} client */
   constructor(client) {
     this._client = client;
   }
 
   /**
    * Create a new pending transaction.
-   * Returns the authorization URL for the payment popup and the
-   * access code the popup uses to identify the transaction.
+   * Returns { authorization_url, access_code, reference }.
+   * Redirect your customer to authorization_url to open the checkout page.
    *
-   * @param {{
-   *   email: string,
-   *   amount: number,
-   *   currency?: string,
-   *   reference?: string,
-   *   callbackUrl?: string,
-   *   channels?: string[],
-   *   metadata?: object
-   * }} input
-   * @returns {Promise<{ authorizationUrl: string, accessCode: string, reference: string }>}
+   * @param {{ email: string, amount: number, currency?: string, reference?: string, callback_url?: string, metadata?: object }} input
    */
-  async initialize({
-    email,
-    amount,
-    currency,
-    reference,
-    callbackUrl,
-    channels,
-    metadata,
-  }) {
-    const data = await this._client._request(
-      "POST",
-      "/api/v1/transaction/initialize",
-      {
-        email,
-        amount,
-        currency,
-        reference,
-        // camelCase → snake_case conversion before sending to API
-        callback_url: callbackUrl,
-        channels,
-        metadata,
-      },
-    );
-    // snake_case → camelCase on the way back
-    return {
-      authorizationUrl: data.authorization_url,
-      accessCode: data.access_code,
-      reference: data.reference,
-    };
+  async initialize(input) {
+    return this._client._do("POST", "/transaction/initialize", input);
   }
 
   /**
    * Verify a transaction by reference.
-   * Call this after the payment popup closes to confirm the outcome.
+   * Always call this before delivering value, never trust the callback URL alone.
    *
    * @param {string} reference
-   * @returns {Promise<object>} Transaction object
    */
   async verify(reference) {
-    return this._client._request(
-      "GET",
-      `/api/v1/transaction/verify/${reference}`,
-    );
+    return this._client._do("GET", `/transaction/verify/${reference}`, null);
   }
 
   /**
-   * Fetch a single transaction by ID.
-   *
+   * Fetch a transaction by ID.
    * @param {string} id
-   * @returns {Promise<object>} Transaction object
    */
-  async get(id) {
-    return this._client._request("GET", `/api/v1/transaction/${id}`);
+  async fetch(id) {
+    return this._client._do("GET", `/transaction/${id}`, null);
   }
 
   /**
    * List transactions with pagination.
-   *
-   * @param {{ page?: number, perPage?: number, status?: string }} opts
-   * @returns {Promise<{ transactions: object[], meta: object }>}
+   * @param {{ page?: number, perPage?: number }} opts
+   * @param {string} [status] - Filter: "success" | "failed" | "pending" | "abandoned"
    */
-  async list({ page = 1, perPage = 50, status = "" } = {}) {
-    let path = `/api/v1/transaction?page=${page}&per_page=${perPage}`;
+  async list({ page = 1, perPage = 50 } = {}, status = "") {
+    let path = `/transaction?page=${page}&perPage=${perPage}`;
     if (status) path += `&status=${status}`;
-    return this._client._request("GET", path);
+    return this._client._do("GET", path, null);
   }
 
   /**
-   * Refund a successful transaction.
-   * Only transactions with status "success" can be refunded.
-   *
+   * Refund (reverse) a successful transaction.
    * @param {string} id
-   * @returns {Promise<object>} Updated transaction object
    */
   async refund(id) {
-    return this._client._request("POST", `/api/v1/transaction/${id}/refund`);
+    return this._client._do("POST", `/transaction/${id}/refund`, null);
   }
 
   /**
-   * Load transaction details for the checkout page.
-   * No secret key required — authenticated via access code in the URL.
-   * Returns amount, merchant branding, customer email and charge flow status.
-   * Call this on checkout page mount to hydrate the payment form.
+   * Load transaction details for the checkout page using the access code.
+   * No secret key required. Returns merchant branding, amount, currency
+   * and current charge flow status.
+   * Call this on checkout page mount.
    *
    * @param {string} accessCode
-   * @returns {Promise<object>} PublicTransactionResponse
-   *
-   * @example
-   * const tx = await client.transaction.publicFetch(accessCode)
-   * console.log(`Pay ${tx.merchant.business_name} ${tx.currency} ${tx.amount / 100}`)
    */
   async publicFetch(accessCode) {
-    return this._client._request(
+    return this._client._doPublic(
       "GET",
       `/api/v1/public/transaction/${accessCode}`,
+      null,
     );
   }
 
   /**
    * Poll transaction status for MoMo pay_offline state.
-   * No secret key required. Check status and charge.flow_status each tick.
-   * Stop polling when status is "success" or "failed".
+   * No secret key required. Poll every 3 seconds, stop when status is
+   * "success" or "failed".
    *
    * @param {string} reference
-   * @returns {Promise<object>} PublicVerifyResponse
    *
    * @example
    * const poll = setInterval(async () => {
    *   const result = await client.transaction.publicVerify(reference)
    *   if (result.status === "success" || result.status === "failed") {
    *     clearInterval(poll)
-   *     handleResult(result)
    *   }
    * }, 3000)
    */
   async publicVerify(reference) {
-    return this._client._request(
+    return this._client._doPublic(
       "GET",
       `/api/v1/public/transaction/verify/${reference}`,
+      null,
     );
   }
 }

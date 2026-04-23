@@ -1,21 +1,26 @@
 {
   "name": "payfake-js",
-  "version": "0.1.0",
-  "description": "JavaScript SDK for Payfake, African payment simulator",
+  "version": "1.0.0",
+  "description": "Official JavaScript SDK for Payfake — Paystack-compatible payment simulator",
   "main": "src/index.js",
   "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
   "scripts": {
     "example": "node example/index.js"
   },
   "keywords": [
     "payfake",
-    "payments",
-    "africa",
-    "ghana",
     "paystack",
+    "payments",
+    "ghana",
+    "africa",
     "simulator"
   ],
   "license": "MIT",
-  "dependencies": {},
-  "devDependencies": {}
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/payfake/payfake-js"
+  }
 }

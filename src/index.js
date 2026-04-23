@@ -1,43 +1,43 @@
+import { Client } from "./client.js";
+import { PayfakeError } from "./errors.js";
+import { AuthNamespace } from "./auth.js";
+import { TransactionNamespace } from "./transaction.js";
+import { ChargeNamespace } from "./charge.js";
+import { CustomerNamespace } from "./customer.js";
+import { MerchantNamespace } from "./merchant.js";
+import { ControlNamespace } from "./control.js";
+
 /**
- * payfake-js
- * JavaScript SDK for Payfake, African payment simulator
+ * Create a new Payfake SDK client.
+ *
+ * @param {{
+ *   secretKey: string,
+ *   baseURL?: string,
+ *   timeout?: number
+ * }} config
  *
  * @example
- * import { createClient, PayfakeError } from "payfake-js"
+ * import { createClient } from "payfake-js"
  *
  * const client = createClient({ secretKey: "sk_test_xxx" })
  *
- * const tx = await client.transaction.initialize({
- *   email: "customer@example.com",
- *   amount: 10000,
- *   currency: "GHS",
+ * // Self-hosted:
+ * const client = createClient({
+ *   secretKey: "sk_test_xxx",
+ *   baseURL:   "http://localhost:8080",
  * })
- *
- * const charge = await client.charge.card({
- *   accessCode: tx.accessCode,
- *   cardNumber: "4111111111111111",
- *   cardExpiry: "12/26",
- *   cvv: "123",
- *   email: "customer@example.com",
- * })
- *
- * console.log(charge.transaction.status) // "success" or "failed"
  */
+export function createClient({ secretKey, baseURL, timeout } = {}) {
+  const httpClient = new Client(secretKey, baseURL, timeout);
 
-import { Client } from "./client.js";
-export { PayfakeError } from "./errors.js";
-
-/**
- * createClient is the recommended way to instantiate the SDK.
- * It's a thin wrapper over new Client(), exists purely so callers
- * don't need to import and new the class separately.
- *
- * @param {object} config
- * @param {string} config.secretKey
- * @param {string} [config.baseURL]
- * @param {number} [config.timeout]
- * @returns {Client}
- */
-export function createClient(config) {
-  return new Client(config);
+  return {
+    auth: new AuthNamespace(httpClient),
+    transaction: new TransactionNamespace(httpClient),
+    charge: new ChargeNamespace(httpClient),
+    customer: new CustomerNamespace(httpClient),
+    merchant: new MerchantNamespace(httpClient),
+    control: new ControlNamespace(httpClient),
+  };
 }
+
+export { PayfakeError };

@@ -1,91 +1,63 @@
 /**
- * CustomerNamespace wraps the /customer endpoints.
- * All methods require the secret key set on the client.
+ * CustomerNamespace wraps /customer endpoints.
+ * These match https://api.paystack.co/customer exactly.
+ * Auth: Bearer sk_test_xxx
  */
 export class CustomerNamespace {
-  /** @param {import("./client.js").Client} client */
+  /** @param {import('./client.js').Client} client */
   constructor(client) {
     this._client = client;
   }
 
   /**
-   * Create a new customer under the merchant account.
-   *
-   * @param {{
-   *   email: string,
-   *   firstName?: string,
-   *   lastName?: string,
-   *   phone?: string,
-   *   metadata?: object
-   * }} input
-   * @returns {Promise<object>} Customer object
+   * Create a new customer.
+   * @param {{ email: string, first_name?: string, last_name?: string, phone?: string, metadata?: object }} input
    */
-  async create({ email, firstName, lastName, phone, metadata }) {
-    return this._client._request("POST", "/api/v1/customer", {
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      phone,
-      metadata,
-    });
+  async create(input) {
+    return this._client._do("POST", "/customer", input);
   }
 
   /**
    * List customers with pagination.
-   *
    * @param {{ page?: number, perPage?: number }} opts
-   * @returns {Promise<{ customers: object[], meta: object }>}
    */
   async list({ page = 1, perPage = 50 } = {}) {
-    return this._client._request(
+    return this._client._do(
       "GET",
-      `/api/v1/customer?page=${page}&per_page=${perPage}`,
+      `/customer?page=${page}&perPage=${perPage}`,
+      null,
     );
   }
 
   /**
    * Fetch a customer by their code (CUS_xxxxxxxx).
-   *
    * @param {string} code
-   * @returns {Promise<object>} Customer object
    */
-  async get(code) {
-    return this._client._request("GET", `/api/v1/customer/${code}`);
+  async fetch(code) {
+    return this._client._do("GET", `/customer/${code}`, null);
   }
 
   /**
    * Partially update a customer.
-   * Only non-undefined fields are sent, undefined means "don't touch".
+   * Only fields present in the input are updated.
    *
    * @param {string} code
-   * @param {{
-   *   firstName?: string,
-   *   lastName?: string,
-   *   phone?: string,
-   *   metadata?: object
-   * }} input
-   * @returns {Promise<object>} Updated customer object
+   * @param {{ first_name?: string, last_name?: string, phone?: string, metadata?: object }} input
    */
-  async update(code, { firstName, lastName, phone, metadata } = {}) {
-    return this._client._request("PUT", `/api/v1/customer/${code}`, {
-      first_name: firstName,
-      last_name: lastName,
-      phone,
-      metadata,
-    });
+  async update(code, input) {
+    return this._client._do("PUT", `/customer/${code}`, input);
   }
 
   /**
-   * Fetch paginated transactions for a specific customer.
-   *
+   * Get paginated transactions for a customer.
    * @param {string} code
    * @param {{ page?: number, perPage?: number }} opts
-   * @returns {Promise<{ transactions: object[], meta: object }>}
    */
   async transactions(code, { page = 1, perPage = 50 } = {}) {
-    return this._client._request(
+    return this._client._do(
       "GET",
-      `/api/v1/customer/${code}/transactions?page=${page}&per_page=${perPage}`,
+      `/customer/${code}/transactions?page=${page}&perPage=${perPage}`,
+      null,
     );
   }
 }
