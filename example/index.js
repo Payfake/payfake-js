@@ -2,7 +2,7 @@ import { createClient, PayfakeError } from "../src/index.js";
 
 const client = createClient({
   secretKey: "sk_test_your_key_here",
-  baseURL: "https://api.payfake.co",
+  baseURL: "http://localhost:8080",
 });
 
 //  Register
@@ -37,7 +37,7 @@ console.log("Secret key:", keys.secret_key.slice(0, 20) + "...");
 
 const authedClient = createClient({
   secretKey: keys.secret_key,
-  baseURL: "https://api.payfake.co",
+  baseURL: "http://localhost:8080",
 });
 
 //  Initialize a transaction
@@ -57,7 +57,7 @@ console.log("\n Card flow (local Verve) ");
 // 4111xxxxxxxxxxxx     = international Visa       → open_url (3DS)
 const step1 = await authedClient.charge.card({
   email: "customer@example.com",
-  accessCode: tx.access_code,
+  reference: tx.reference,
   card: {
     number: "5061000000000000",
     cvv: "123",
@@ -102,7 +102,7 @@ const tx2 = await authedClient.transaction.initialize({
 
 const momo1 = await authedClient.charge.mobileMoney({
   email: "momo@example.com",
-  accessCode: tx2.access_code,
+  reference: tx2.reference,
   mobileMoney: { phone: "+233241234567", provider: "mtn" },
 });
 console.log("MoMo step 1:", momo1.status); // send_otp
@@ -117,7 +117,10 @@ console.log("MoMo step 2:", momo2.status); // pay_offline
 // Poll until resolved
 console.log("Polling for resolution...");
 for (let i = 0; i < 10; i++) {
-  const result = await authedClient.transaction.publicVerify(tx2.reference);
+  const result = await authedClient.transaction.publicVerify(
+    tx2.reference,
+    tx2.access_code,
+  );
   console.log(
     `  poll ${i + 1}: status=${result.status} flow=${result.charge?.flow_status ?? "–"}`,
   );
@@ -144,7 +147,7 @@ const tx3 = await authedClient.transaction.initialize({
 try {
   await authedClient.charge.card({
     email: "fail@example.com",
-    accessCode: tx3.access_code,
+    reference: tx3.reference,
     card: {
       number: "5061000000000000",
       cvv: "123",

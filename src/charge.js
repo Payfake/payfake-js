@@ -22,16 +22,14 @@ export class ChargeNamespace {
    * @param {{
    *   email: string,
    *   amount?: number,
-   *   accessCode?: string,
-   *   reference?: string,
+   *   reference: string,
    *   card: { number: string, cvv: string, expiryMonth: string, expiryYear: string }
    * }} input
    */
-  async card({ email, amount, accessCode, reference, card }) {
+  async card({ email, amount, reference, card }) {
     return this._client._do("POST", "/charge", {
       email,
       amount,
-      access_code: accessCode,
       reference,
       card: card
         ? {
@@ -52,16 +50,14 @@ export class ChargeNamespace {
    * @param {{
    *   email: string,
    *   amount?: number,
-   *   accessCode?: string,
-   *   reference?: string,
+   *   reference: string,
    *   mobileMoney: { phone: string, provider: "mtn" | "vodafone" | "airteltigo" }
    * }} input
    */
-  async mobileMoney({ email, amount, accessCode, reference, mobileMoney }) {
+  async mobileMoney({ email, amount, reference, mobileMoney }) {
     return this._client._do("POST", "/charge", {
       email,
       amount,
-      access_code: accessCode,
       reference,
       mobile_money: mobileMoney
         ? {
@@ -79,17 +75,15 @@ export class ChargeNamespace {
    * @param {{
    *   email: string,
    *   amount?: number,
-   *   accessCode?: string,
-   *   reference?: string,
+   *   reference: string,
    *   bank: { code: string, accountNumber: string },
    *   birthday?: string
    * }} input
    */
-  async bank({ email, amount, accessCode, reference, bank, birthday }) {
+  async bank({ email, amount, reference, bank, birthday }) {
     return this._client._do("POST", "/charge", {
       email,
       amount,
-      access_code: accessCode,
       reference,
       birthday,
       bank: bank

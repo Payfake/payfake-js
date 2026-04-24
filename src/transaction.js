@@ -79,19 +79,20 @@ export class TransactionNamespace {
    * "success" or "failed".
    *
    * @param {string} reference
+   * @param {string} access_code
    *
    * @example
    * const poll = setInterval(async () => {
-   *   const result = await client.transaction.publicVerify(reference)
+   *   const result = await client.transaction.publicVerify(reference, access_code)
    *   if (result.status === "success" || result.status === "failed") {
    *     clearInterval(poll)
    *   }
    * }, 3000)
    */
-  async publicVerify(reference) {
+  async publicVerify(reference, access_code) {
     return this._client._doPublic(
       "GET",
-      `/api/v1/public/transaction/verify/${reference}`,
+      `/api/v1/public/transaction/verify/${reference}?access_code=${access_code}`,
       null,
     );
   }
